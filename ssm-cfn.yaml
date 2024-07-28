@@ -1,0 +1,107 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+    Read SSM parameters and create a file in S3 Bucket.
+Parameters:
+  LambdaFunctionName:
+    Type: String
+    MinLength: '1'
+    MaxLength: '64'
+    AllowedPattern: '[\w+=,.@-]+'
+    Description: The name of the IAM role used as the Lambda execution role
+    Default: Lambda-SSM
+  LambdaRoleName:
+    Type: String
+    MinLength: '1'
+    MaxLength: '64'
+    Description: The name of the IAM role used as the Lambda execution role
+    Default: Lambda-Role-CFNExample
+  S3Bucket:
+    Type: String
+    MinLength: '3'
+    MaxLength: '255'
+    AllowedPattern: '[a-zA-Z0-9_.-]+'
+    Description: The name of the S3 Bucket.
+    Default: ssm-lambda-python
+  
+    
+Resources:
+        
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ['',['/aws/lambda/', !Ref LambdaFunctionName]]
+      RetentionInDays: 30
+            
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Reads ssm parameters and stores the details in S3 bucket.
+      FunctionName: !Ref LambdaFunctionName
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Runtime: python3.8
+      Role: !Ref 'LambdaRoleName'
+      Timeout: 240
+      Environment:
+        Variables:
+          KeyName: UserName
+          S3bucket: !Ref S3Bucket
+          StackId: !Ref AWS::StackId
+      Code:
+        ZipFile: |
+            # Imports
+            import os
+            import boto3
+            import botocore
+            import logging
+            import random
+            import string
+            import json
+            import cfnresponse
+
+            # Set up clients and resources
+            ssmclient = boto3.client('ssm')
+
+            # Set up the logger
+            logger = logging.getLogger()
+            logger.setLevel(logging.INFO)
+            #logger.setLevel(logging.DEBUG) # Very verbose
+
+            keyname = os.environ.get('KeyName')
+            s3_bucket = os.environ.get('S3bucket')
+            stack_id = os.environ.get('StackId')
+
+            def lambda_handler(event, context):
+                
+                def read_ssm_param(keyname):
+                    response = keyname + ":" + ssm.get_parameter(Name=keyname)['Parameter']['Value']
+                    return(response)
+                
+                def upload_s3bucket(ssm_response):
+                    file_name = 'ssm_param.txt'
+                    s3 = boto3.client('s3') 
+                    s3.put_object(Body=file_content, Bucket=bucket_name, Key=file_name)
+                    return("uploaded")
+                    
+                
+                try:    
+                    ssm_response = read_ssm_param(keyname) # get ssm parameter 
+                    upload_ssm_s3 = upload_s3bucket(ssm_response)
+                    stack_id = StackId
+                    if upload_ssm_s3 == 'uploaded':
+                       responseData = {}
+                       responseData['Data'] = "Uploaded SSM params in S3"
+                       cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData, stack_id)
+                    logger.info(ssm_response)
+                except botocore.exceptions.ClientError as error:
+                    raise error
+                    
+                return(ssm_response)
+    
+        
+Outputs:
+  CLI:
+    Description: Use this command to invoke the Lambda function
+    Value: !Sub |
+        aws lambda invoke --function-name ${LambdaFunction} --payload '{"null": "null"}' lambda-output.txt --cli-binary-format raw-in-base64-out
