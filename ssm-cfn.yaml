@@ -75,7 +75,7 @@ Resources:
             def lambda_handler(event, context):
                 
                 def read_ssm_param(keyname):
-                    response = keyname + ":" + ssm.get_parameter(Name=keyname)['Parameter']['Value']
+                    response = keyname + ":" + ssmclient.get_parameter(Name=keyname)['Parameter']['Value']
                     return(response)
                 
                 def upload_s3bucket(ssm_response):
