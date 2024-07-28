@@ -81,14 +81,13 @@ Resources:
                 def upload_s3bucket(ssm_response):
                     file_name = 'ssm_param.txt'
                     s3 = boto3.client('s3') 
-                    s3.put_object(Body=file_content, Bucket=bucket_name, Key=file_name)
+                    s3.put_object(Body=ssm_response, Bucket=s3_bucket, Key=file_name)
                     return("uploaded")
                     
                 
                 try:    
                     ssm_response = read_ssm_param(keyname) # get ssm parameter 
                     upload_ssm_s3 = upload_s3bucket(ssm_response)
-                    stack_id = StackId
                     if upload_ssm_s3 == 'uploaded':
                        responseData = {}
                        responseData['Data'] = "Uploaded SSM params in S3"
